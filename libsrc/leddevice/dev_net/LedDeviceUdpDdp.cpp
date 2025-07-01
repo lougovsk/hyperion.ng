@@ -161,3 +161,8 @@ int LedDeviceUdpDdp::write(const std::vector<ColorRgb> &ledValues)
 	return rc;
 }
 
+int LedDeviceUdpDdp::close()
+{
+	// Call the base class close method
+	return ProviderUdp::close();
+}

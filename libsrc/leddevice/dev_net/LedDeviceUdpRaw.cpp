@@ -90,3 +90,9 @@ QJsonObject LedDeviceUdpRaw::getProperties(const QJsonObject& params)
 
 	return properties;
 }
+
+int LedDeviceUdpRaw::close()
+{
+	// Call the base class close method
+	return ProviderUdp::close();
+}

@@ -3,15 +3,19 @@
 
 // LedDevice includes
 #include <leddevice/LedDevice.h>
-#include "ProviderRestApi.h"
+// #include "ProviderRestApi.h" // Included via LedDevice
 #include "LedDeviceUdpDdp.h"
 #include "LedDeviceUdpRaw.h"
 
 #include <utils/version.hpp>
+
+// Forward declaration
+class ProviderRestApi;
+
 ///
 /// Implementation of a WLED-device
 ///
-class LedDeviceWled : public LedDeviceUdpDdp, LedDeviceUdpRaw
+class LedDeviceWled : public LedDevice
 {
 
 public:
@@ -155,7 +159,8 @@ private:
 	bool isReadyForSegmentStreaming(semver::version& version) const;
 	bool isReadyForDDPStreaming(semver::version& version) const;
 
-	QString resolveAddress (const QString& hostName);
+	/// Protocol provider
+	ProviderUdp* _protocolDevice;
 
 	///REST-API wrapper
 	ProviderRestApi* _restApi;

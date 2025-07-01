@@ -84,7 +84,8 @@ constexpr std::chrono::milliseconds DEFAULT_IDENTIFY_TIME{ 2000 };
 } //End of constants
 
 LedDeviceWled::LedDeviceWled(const QJsonObject &deviceConfig)
-	: ProviderUdp(deviceConfig), LedDeviceUdpDdp(deviceConfig), LedDeviceUdpRaw(deviceConfig)
+	: LedDevice(deviceConfig)
+	  ,_protocolDevice(nullptr)
 	  ,_restApi(nullptr)
 	  ,_apiPort(API_DEFAULT_PORT)
 	  ,_currentVersion("")
@@ -108,6 +109,9 @@ LedDeviceWled::~LedDeviceWled()
 {
 	delete _restApi;
 	_restApi = nullptr;
+
+	delete _protocolDevice;
+	_protocolDevice = nullptr;
 }
 
 LedDevice* LedDeviceWled::construct(const QJsonObject &deviceConfig)
@@ -128,18 +132,37 @@ bool LedDeviceWled::init(const QJsonObject &deviceConfig)
 	Debug(_log, "Stream protocol   : %s", QSTRING_CSTR(streamProtocol));
 	Debug(_log, "Stream DDP        : %d", _isStreamDDP);
 
+	// _protocolDeviceConfig is not needed anymore as we pass deviceConfig directly
+
 	if (_isStreamDDP)
 	{
-		LedDeviceUdpDdp::init(deviceConfig);
+		_protocolDevice = new LedDeviceUdpDdp(deviceConfig);
+		// The LedDeviceUdpDdp constructor calls LedDevice::init,
+		// then its own init will be called here for DDP specific things.
+		if (_protocolDevice) {
+			isInitOK = _protocolDevice->init(deviceConfig);
+		} else {
+			isInitOK = false; // Should not happen if new doesn't throw
+		}
 	}
 	else
 	{
-		_devConfig["port"] = UDP_STREAM_DEFAULT_PORT;
-		LedDeviceUdpRaw::init(_devConfig);
+		// Make a mutable copy to set the port for Raw UDP
+		QJsonObject rawConfig = deviceConfig;
+		rawConfig["port"] = UDP_STREAM_DEFAULT_PORT;
+		// Pass the modified rawConfig to constructor and init
+		_protocolDevice = new LedDeviceUdpRaw(rawConfig);
+		if (_protocolDevice) {
+			isInitOK = _protocolDevice->init(rawConfig);
+		} else {
+			isInitOK = false; // Should not happen
+		}
 	}
 
-	if (!_isDeviceInError)
+	// Check if protocol device initialization was successful
+	if (isInitOK && _protocolDevice && !_protocolDevice->isDeviceInError()) // Check error state from protocol device
 	{
+		// WLED specific initializations
 		_apiPort = API_DEFAULT_PORT;
 		_isRestoreOrigState = _devConfig[CONFIG_RESTORE_STATE].toBool(DEFAULT_IS_RESTORE_STATE);
 		_isStayOnAfterStreaming = _devConfig[CONFIG_STAY_ON_AFTER_STREAMING].toBool(DEFAULT_IS_STAY_ON_AFTER_STREAMING);
@@ -177,67 +200,117 @@ bool LedDeviceWled::init(const QJsonObject &deviceConfig)
 
 bool LedDeviceWled::openRestAPI()
 {
-	bool isInitOK {true};
+	// _address is from LedDevice base, populated by LedDevice::init via resolveHostToAddress
+	// _hostName is also from LedDevice base, set from config or taken for local
+	// NetUtils::resolveHostToAddress is called in LedDevice::init if "host" is in config.
+	// If "host" is not in config, _address might be uninitialized or loopback.
+	// We must ensure _address is valid before using it.
+
+	if (_address.isNull() && !_hostName.isEmpty())
+	{
+		// Attempt to resolve if _address is null but we have a _hostName (e.g. from config)
+		// This might be redundant if LedDevice::init already did this.
+		// However, getProperties/identify might call openRestAPI after changing _hostName.
+		Warning(_log, "Address was null, attempting to resolve %s for REST API", QSTRING_CSTR(_hostName));
+		if (!NetUtils::resolveHostToAddress(_log, _hostName, _address, _apiPort <= 0 ? 80 : _apiPort)) {
+			Error(_log, "Failed to resolve host '%s' for REST API.", QSTRING_CSTR(_hostName));
+			return false;
+		}
+	}
+	else if (_address.isNull() && _hostName.isEmpty())
+	{
+		Error(_log, "Host address and hostname are unknown, cannot open REST API.");
+		return false;
+	}
+
 
 	if ( _restApi == nullptr )
 	{
-		_restApi = new ProviderRestApi(_address.toString(), _apiPort);
+		_restApi = new ProviderRestApi(_address.toString(), _apiPort > 0 ? _apiPort : 80); // Default to port 80 if _apiPort is not set
+		if (!_restApi) { // Should ideally not be hit as new throws std::bad_alloc
+		    Error(_log, "Failed to allocate ProviderRestApi.");
+		    return false;
+		}
 		_restApi->setLogger(_log);
-
 		_restApi->setBasePath( API_BASE_PATH );
 	}
 	else
 	{
+		// If _restApi already exists, update its host and port
 		_restApi->setHost(_address.toString());
-		_restApi->setPort(_apiPort);
+		_restApi->setPort(_apiPort > 0 ? _apiPort : 80);
 	}
-
-	return isInitOK;
+	return true;
 }
 
 int LedDeviceWled::open()
 {
 	int retval = -1;
-	_isDeviceReady = false;
+	// _isDeviceReady will be set by the base LedDevice or specific protocol device.
+	// We need to ensure _hostName, _address are set for WLED instance itself for REST API.
+	// These might need to be members of LedDeviceWled directly, or accessed via a common way.
+	// Assuming _hostName is part of _devConfig from LedDevice base.
+	// And _address is resolved and stored in LedDeviceWled or accessible.
 
-	if (NetUtils::resolveHostToAddress(_log, _hostName, _address, _apiPort))
+	// Resolve hostname for REST API calls. The protocol drivers will resolve for their own needs.
+	// ProviderRestApi needs _address to be set.
+	// Let's assume _address is a member of LedDeviceWled now, and _hostName is from _devConfig.
+	// This part needs careful handling of where host/address are stored post-refactor.
+	// For now, let's assume _hostName and _address are correctly populated for WLED's own use (REST API).
+	// The LedDevice::init calls NetUtils::resolveHostToAddress if "host" is in config.
+	// So, _address in LedDevice base class should be populated.
+
+	if (!openRestAPI()) // Sets up _restApi using _address (from base LedDevice) and _apiPort
 	{
-		if ( openRestAPI() )
-		{
-			if (_isStreamDDP)
-			{
-				if (LedDeviceUdpDdp::open() == 0)
-				{
-					// Everything is OK, device is ready
-					_isDeviceReady = true;
-					retval = 0;
-				}
-			}
-			else
-			{
-				if (LedDeviceUdpRaw::open() == 0)
-				{
-					// Everything is OK, device is ready
-					_isDeviceReady = true;
-					retval = 0;
-				}
-			}
+		// If REST API setup fails, we probably can't proceed meaningfully for WLED specific controls
+		// though the color stream might still work if protocolDevice opens.
+		// However, WLED relies on REST API for power on/off, state management.
+		// Setting inError in openRestAPI if it fails.
+		_isDeviceReady = false; // Ensure device is not marked ready
+		return -1; // Early exit if REST API can't be set up
+	}
+
+	if (_protocolDevice == nullptr)
+	{
+		Error(_log, "Protocol device not initialized before open attempt.");
+		_isDeviceReady = false;
+		return -1;
+	}
+
+	if (_protocolDevice->open() == 0)
+	{
+		// Check the ready state of the protocol device itself
+		if (_protocolDevice->isReady()) {
+			_isDeviceReady = true; // WLED device is ready if its protocol part is ready
+			retval = 0;
+		} else {
+			Warning(_log, "Protocol device opened but reported not ready.");
+			_isDeviceReady = false; // Match protocol device state
+			retval = -1; // Or specific error from protocolDevice->open() if it was not 0
 		}
 	}
+	else
+	{
+		Error(_log, "Failed to open protocol device.");
+		_isDeviceReady = false;
+		retval = -1;
+	}
+
 	return retval;
 }
 
 int LedDeviceWled::close()
 {
-	int retval = -1;
-	if (_isStreamDDP)
+	int retval = 0; // Default to success if no protocol device or already closed
+	_isDeviceReady = false; // Mark as not ready when closing
+
+	if (_protocolDevice)
 	{
-		retval = LedDeviceUdpDdp::close();
+		retval = _protocolDevice->close();
 	}
-	else
-	{
-		retval = LedDeviceUdpRaw::close();
-	}
+	// If _protocolDevice is null, it means init probably failed or was never called.
+	// In such a case, there's nothing to close for the protocol part.
+	// LedDevice::close() itself might do other cleanups.
 	return retval;
 }
 
@@ -647,16 +720,18 @@ void LedDeviceWled::identify(const QJsonObject& params)
 
 int LedDeviceWled::write(const std::vector<ColorRgb> &ledValues)
 {
-	int rc {0};
-
-	if (_isStreamDDP)
+	// Check if the device is ready to receive data.
+	// _isDeviceReady is set by open() based on successful REST API and protocol device open.
+	if (!_isDeviceReady || _protocolDevice == nullptr)
 	{
-		rc = LedDeviceUdpDdp::write(ledValues);
-	}
-	else
-	{
-		rc = LedDeviceUdpRaw::write(ledValues);
+		// If not ready, or protocol device doesn't exist, cannot write.
+		// Log an error if _protocolDevice is null but _isDeviceReady was somehow true.
+		if (_isDeviceReady && _protocolDevice == nullptr) {
+			Error(_log, "Device is ready but protocol device is null. Inconsistent state.");
+		}
+		return -1;
 	}
 
-	return rc;
+	// Delegate the write call to the instantiated protocol device.
+	return _protocolDevice->write(ledValues);
 }

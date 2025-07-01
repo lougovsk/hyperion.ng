@@ -4,12 +4,17 @@
 // hyperion includes
 #include "ProviderUdp.h"
 
+// Forward declaration
+class LedDeviceWled;
+
 ///
 /// Implementation of the LedDevice interface for sending LED colors via UDP and the Distributed Display Protocol (DDP)
 /// http://www.3waylabs.com/ddp/#Data%20Types
 ///
 class LedDeviceUdpDdp : public virtual ProviderUdp
 {
+	friend class LedDeviceWled;
+
 public:
 
 	///
@@ -51,6 +56,13 @@ protected:
 	/// @return Zero on success, else negative
 	///
 	int write(const std::vector<ColorRgb> & ledValues) override;
+
+	///
+	/// @brief Closes the UDP device.
+	///
+	/// @return Zero on success (i.e. device is closed), else negative
+	///
+	int close() override;
 
 private:
 
