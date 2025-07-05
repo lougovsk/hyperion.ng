@@ -87,7 +87,7 @@ void WledRestClient::clearError()
     _errorReason.clear();
 }
 
-bool WledRestClient::sendStateUpdateRequest(const QJsonObject &request, const QString requestType)
+bool WledRestClient::sendStateUpdateRequest(const QJsonObject &request, const QString& requestType)
 {
     if (!_isDeviceReady)
     {

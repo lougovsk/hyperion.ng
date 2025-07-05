@@ -158,6 +158,7 @@ private:
 
 	// Configuration and State members
 	QString _hostAddressResolved; // Store the resolved IP address
+	QString _hostName;
 	int _apiPort;
 	int _streamPort; // Port for DDP or Raw UDP streaming
 

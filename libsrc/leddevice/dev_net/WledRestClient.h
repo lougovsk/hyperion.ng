@@ -73,6 +73,7 @@ public:
 
     QString getErrorReason() const { return _errorReason; }
     bool isInError() const { return _isInError; }
+	bool isDeviceReady() const { return _isDeviceReady; }
     void setLogger(Logger* logger);
 
 

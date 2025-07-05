@@ -117,7 +117,6 @@ bool LedDeviceWled::init(const QJsonObject &deviceConfig)
 	{
 		_streamPort = _devConfig["port"].toInt(DDP_STREAM_DEFAULT_PORT); // DDP port from config or default
 		_ddpClient = std::make_unique<DdpClient>(_hostName, _streamPort);
-		_ddpClient->setLogger(_log); // Pass logger
 		Debug(_log, "  DDP Streaming Port: %d", _streamPort);
 	}
 	else // UDP-RAW
@@ -133,7 +132,6 @@ bool LedDeviceWled::init(const QJsonObject &deviceConfig)
 			return false;
 		}
 		_rawClient = std::make_unique<RawClient>(_hostName, _streamPort);
-		_rawClient->setLogger(_log); // Pass logger
 		Debug(_log, "  Raw UDP Streaming Port: %d", _streamPort);
 	}
 
@@ -487,7 +485,7 @@ bool LedDeviceWled::storeState()
 		Debug(_log, "No conditions require storing WLED state.");
 		_originalStateProperties = QJsonObject(); // Ensure it's cleared
 		_wledInfo = QJsonObject();
-		_currentVersion.clear();
+		_currentVersion.setVersion(std::string(""));
 		return true; // Nothing to do, so it's a "success"
 	}
 
@@ -535,7 +533,7 @@ bool LedDeviceWled::storeState()
 		}
 	} else {
 		Warning(_log, "WLED version string is empty in info object. Version checks will fail.");
-		_currentVersion.clear();
+		_currentVersion.setVersion(std::string(""));
 	}
 	return true;
 }
