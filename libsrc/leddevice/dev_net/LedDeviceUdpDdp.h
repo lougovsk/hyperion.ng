@@ -1,14 +1,17 @@
 #ifndef LEDEVICEUDPDDP_H
 #define LEDEVICEUDPDDP_H
 
-// hyperion includes
-#include "ProviderUdp.h"
+// LedDevice includes
+#include <leddevice/LedDevice.h>
+
+// Forward declaration
+class DdpClient;
 
 ///
 /// Implementation of the LedDevice interface for sending LED colors via UDP and the Distributed Display Protocol (DDP)
 /// http://www.3waylabs.com/ddp/#Data%20Types
 ///
-class LedDeviceUdpDdp : public virtual ProviderUdp
+class LedDeviceUdpDdp : public LedDevice
 {
 public:
 
@@ -18,6 +21,11 @@ public:
 	/// @param deviceConfig Device's configuration as JSON-Object
 	///
 	explicit LedDeviceUdpDdp(const QJsonObject &deviceConfig);
+
+	///
+	/// @brief Destructor of the LedDevice
+	///
+	~LedDeviceUdpDdp() override;
 
 	///
 	/// @brief Constructs the LED-device
@@ -45,6 +53,13 @@ protected:
 	int open() override;
 
 	///
+	/// @brief Closes the output device.
+	///
+	/// @return Zero on success (i.e. device is closed), else negative
+	///
+	int close() override;
+
+	///
 	/// @brief Writes the RGB-Color values to the LEDs.
 	///
 	/// @param[in] ledValues The RGB-color per LED
@@ -53,10 +68,9 @@ protected:
 	int write(const std::vector<ColorRgb> & ledValues) override;
 
 private:
-
-	QByteArray  _ddpData;
-
-	int _packageSequenceNumber;
+	std::unique_ptr<DdpClient> _ddpClient;
+	QString _hostName;
+	int _port;
 };
 
 #endif // LEDEVICEUDPDDP_H

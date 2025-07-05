@@ -1,13 +1,16 @@
 #ifndef LEDEVICEUDPRAW_H
 #define LEDEVICEUDPRAW_H
 
-// hyperion includes
-#include "ProviderUdp.h"
+// LedDevice includes
+#include <leddevice/LedDevice.h>
+
+// Forward declaration
+class RawClient;
 
 ///
 /// Implementation of the LedDevice interface for sending LED colors via UDP
 ///
-class LedDeviceUdpRaw : public virtual ProviderUdp
+class LedDeviceUdpRaw : public LedDevice
 {
 public:
 
@@ -17,6 +20,11 @@ public:
 	/// @param deviceConfig Device's configuration as JSON-Object
 	///
 	explicit LedDeviceUdpRaw(const QJsonObject &deviceConfig);
+
+	///
+	/// @brief Destructor of the LedDevice
+	///
+	~LedDeviceUdpRaw() override;
 
 	///
 	/// @brief Constructs the LED-device
@@ -52,12 +60,24 @@ protected:
 	int open() override;
 
 	///
+	/// @brief Closes the output device.
+	///
+	/// @return Zero on success (i.e. device is closed), else negative
+	///
+	int close() override;
+
+	///
 	/// @brief Writes the RGB-Color values to the LEDs.
 	///
 	/// @param[in] ledValues The RGB-color per LED
 	/// @return Zero on success, else negative
 	///
 	int write(const std::vector<ColorRgb> & ledValues) override;
+
+private:
+	std::unique_ptr<RawClient> _rawClient;
+	QString _hostName;
+	int _port;
 };
 
 #endif // LEDEVICEUDPRAW_H
