@@ -2,16 +2,18 @@
 #define LEDDEVICEWLED_H
 
 // LedDevice includes
-#include <leddevice/LedDevice.h>
-#include "ProviderRestApi.h"
-#include "LedDeviceUdpDdp.h"
-#include "LedDeviceUdpRaw.h"
+#include <leddevice/LedDevice.h> // Main base class
+#include "DdpClient.h"           // For DDP streaming
+#include "RawClient.h"           // For Raw UDP streaming
+#include "WledRestClient.h"      // For WLED REST API communication
 
 #include <utils/version.hpp>
+#include <memory> // For std::unique_ptr
+
 ///
 /// Implementation of a WLED-device
 ///
-class LedDeviceWled : public LedDeviceUdpDdp, LedDeviceUdpRaw
+class LedDeviceWled : public LedDevice // Inherit from LedDevice directly
 {
 
 public:
@@ -139,47 +141,43 @@ protected:
 	bool restoreState() override;
 
 private:
+	// Removed: openRestAPI, getUdpnObject, getSegmentObject, sendStateUpdateRequest
+	// These are now part of WledRestClient or handled differently.
 
-	///
-	/// @brief Initialise the access to the REST-API wrapper
-	///
-	/// @return True, if success
-	///
-	bool openRestAPI();
+	bool isReadyForSegmentStreaming(const semver::version& version) const; // Made const, takes const ref
+	bool isReadyForDDPStreaming(const semver::version& version) const;   // Made const, takes const ref
 
-	QJsonObject getUdpnObject(bool send, bool recv) const;
-	QJsonObject getSegmentObject(int segmentId, bool isOn, int brightness=-1) const;
+	// Removed: resolveAddress - NetUtils::resolveHostToAddress is used directly or within clients
 
-	bool sendStateUpdateRequest(const QJsonObject &request, const QString requestType = "");
+	// Streaming clients
+	std::unique_ptr<DdpClient> _ddpClient;
+	std::unique_ptr<RawClient> _rawClient;
 
-	bool isReadyForSegmentStreaming(semver::version& version) const;
-	bool isReadyForDDPStreaming(semver::version& version) const;
+	// WLED REST API client
+	std::unique_ptr<WledRestClient> _wledRestClient;
 
-	QString resolveAddress (const QString& hostName);
+	// Configuration and State members
+	QString _hostAddressResolved; // Store the resolved IP address
+	int _apiPort;
+	int _streamPort; // Port for DDP or Raw UDP streaming
 
-	///REST-API wrapper
-	ProviderRestApi* _restApi;
+	QJsonObject _wledInfo; // Might be fetched and stored via _wledRestClient
+	QJsonObject _originalStateProperties; // Might be fetched and stored via _wledRestClient
 
-	QString _hostAddress;
-	int		_apiPort;
-
-	QJsonObject _wledInfo;
-	QJsonObject _originalStateProperties;
-
-	semver::version _currentVersion;
+	semver::version _currentVersion; // Parsed from _wledInfo
 
 	bool _isBrightnessOverwrite;
 	int _brightness;
 
 	bool _isSyncOverwrite;
-	bool _originalStateUdpnSend;
-	bool _originalStateUdpnRecv;
+	bool _originalStateUdpnSend; // From original state, used for restore
+	bool _originalStateUdpnRecv; // From original state, used for restore
 
-	bool _isStreamDDP;
+	bool _isStreamDDP; // True if DDP protocol is used, false for Raw UDP
 
 	int _streamSegmentId;
 	bool _isSwitchOffOtherSegments;
-	bool _isStreamToSegment;
+	bool _isStreamToSegment; // True if streaming to a specific segment
 };
 
 #endif // LEDDEVICEWLED_H
