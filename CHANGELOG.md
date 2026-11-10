@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for **Robobloq** devices
 - Color adjustment: Add configurable per-LED brightness hysteresis thresholds to help prevent flicker near black (#1968).
 - Serial-LED-Devices: Support to add devices via /dev/serial/by-id (#1511)
+- V4l2-Grabber (standalone) - Add options `--brightness`, `--contrast`, `--saturation` and `--hue` to set the hardware picture controls of the capture device
 
 ### 🔧 Changed
 
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - QHttpServer - Fix memory leak
   - macOS Signal Handler - Exit after a crash instead of hanging at 100% CPU. The stack trace parser assumed the glibc format and faulted on macOS traces
   - V4l2-Grabber - Fix MJPEG support identification and show all supported formats in the help text dynamically (#2072)
+  - V4l2-Grabber (standalone) - Do not reset the capture device's brightness, contrast, saturation and hue to 0 on start; they are left unchanged unless set via the new options
 
 ---
 ### Technical

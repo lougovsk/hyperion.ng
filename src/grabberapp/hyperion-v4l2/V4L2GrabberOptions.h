@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits>
+
 #include <QString>
 
 #include <hyperion/GrabberWrapper.h>
@@ -24,6 +26,15 @@ struct V4L2GrabberOptions
 
 	bool video3DSBS = false;
 	bool video3DTAB = false;
+
+	// Hardware picture controls of the capture device (the value range is device specific).
+	// A control that is not set stays at NO_CHANGE: this is outside of any device's value range,
+	// which makes V4L2Grabber leave the control as it is (see V4L2Wrapper).
+	static constexpr int HARDWARE_CONTROL_NO_CHANGE = std::numeric_limits<int>::min();
+	int brightness = HARDWARE_CONTROL_NO_CHANGE;
+	int contrast = HARDWARE_CONTROL_NO_CHANGE;
+	int saturation = HARDWARE_CONTROL_NO_CHANGE;
+	int hue = HARDWARE_CONTROL_NO_CHANGE;
 
 	bool signalDetectionEnabled = true;
 	double signalThresholdRed = 0.0;

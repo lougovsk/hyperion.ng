@@ -40,6 +40,11 @@ V4L2GrabberOptions parseV4L2GrabberOptions(const QCoreApplication& app)
 	BooleanOption const& arg3DSBS = parser.add<BooleanOption>(0x0, "3DSBS", "Interpret the incoming video stream as 3D side-by-side");
 	BooleanOption const& arg3DTAB = parser.add<BooleanOption>(0x0, "3DTAB", "Interpret the incoming video stream as 3D top-and-bottom");
 
+	IntOption& argBrightness = parser.add<IntOption>(0x0, "brightness", "Hardware brightness of the capture device (the value range depends on the device). The device setting is left unchanged if not set");
+	IntOption& argContrast = parser.add<IntOption>(0x0, "contrast", "Hardware contrast of the capture device (the value range depends on the device). The device setting is left unchanged if not set");
+	IntOption& argSaturation = parser.add<IntOption>(0x0, "saturation", "Hardware saturation of the capture device (the value range depends on the device). The device setting is left unchanged if not set");
+	IntOption& argHue = parser.add<IntOption>(0x0, "hue", "Hardware hue of the capture device (the value range depends on the device). The device setting is left unchanged if not set");
+
 	BooleanOption const& argSignalDetection = parser.add<BooleanOption>(0x0, "signal-detection-disabled", "disable signal detection");
 	DoubleOption& argSignalThreshold = parser.add<DoubleOption>(0x0, "signal-threshold", "The signal threshold for detecting the presence of a signal. Value should be between 0.0 and 1.0.", QString(), 0.0, 1.0);
 	DoubleOption& argRedSignalThreshold = parser.add<DoubleOption>(0x0, "red-threshold", "The red signal threshold. Value should be between 0.0 and 1.0. (overrides --signal-threshold)", QString(), 0.0, 1.0);
@@ -104,6 +109,12 @@ V4L2GrabberOptions parseV4L2GrabberOptions(const QCoreApplication& app)
 
 	opts.video3DSBS = parser.isSet(arg3DSBS);
 	opts.video3DTAB = parser.isSet(arg3DTAB);
+
+	// Hardware picture controls are only changed on the device when explicitly set
+	if (parser.isSet(argBrightness)) { opts.brightness = argBrightness.getInt(parser); }
+	if (parser.isSet(argContrast))   { opts.contrast   = argContrast.getInt(parser); }
+	if (parser.isSet(argSaturation)) { opts.saturation = argSaturation.getInt(parser); }
+	if (parser.isSet(argHue))        { opts.hue        = argHue.getInt(parser); }
 
 	opts.signalDetectionEnabled = !parser.isSet(argSignalDetection);
 	opts.signalThresholdRed   = std::min(1.0, std::max(0.0, parser.isSet(argRedSignalThreshold)   ? argRedSignalThreshold.getDouble(parser)   : argSignalThreshold.getDouble(parser)));

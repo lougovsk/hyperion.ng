@@ -62,6 +62,12 @@ V4L2Wrapper::V4L2Wrapper(const V4L2GrabberOptions& opts)
 
 	_grabber.setCropping(opts.cropLeft, opts.cropRight, opts.cropTop, opts.cropBottom);
 
+	// V4L2Grabber applies brightness, contrast, saturation and hue whenever the value lies within the
+	// device's range and differs from the device's current value. Its defaults are 0, which would reset
+	// these controls on every start, so always pass the options on: a control that is not set carries
+	// V4L2GrabberOptions::HARDWARE_CONTROL_NO_CHANGE, which is out of range and leaves the control as it is.
+	_grabber.setBrightnessContrastSaturationHue(opts.brightness, opts.contrast, opts.saturation, opts.hue);
+
 	if (opts.applySignalDetectionOffset)
 	{
 		_grabber.setSignalDetectionOffset(opts.signalHorizontalMin, opts.signalVerticalMin, opts.signalHorizontalMax, opts.signalVerticalMax);
